@@ -268,9 +268,22 @@ function onPointerDown(e,desc){
   if(e.button!==undefined && e.button!==0)return;
   if(drag)cancelDrag();
   if(desc.kind==='organ'&&desc.o.placed&&activeTool?.kind==='matter')clearSelection();
-  drag={...desc,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,started:false,ghost:null};
+  // 記住「原本就在畫布上」與「從卡池首次拖出」，不可在跨過卡池邊界前就改變來源元素的位置。
+  const wasPlaced=desc.kind==='organ'&&desc.o.placed;
+  let offX=0,offY=0;
+  if(wasPlaced){
+    const r=canvas.getBoundingClientRect();
+    offX=e.clientX-r.left-desc.o.x;offY=e.clientY-r.top-desc.o.y;
+  }
+  drag={...desc,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,started:false,ghost:null,wasPlaced,offX,offY};
   e.stopPropagation();window.addEventListener('pointermove',onPointerMove,{passive:false});
   window.addEventListener('pointerup',onPointerUp);window.addEventListener('pointercancel',onPointerCancel);
+}
+function moveFloatingOrgan(d,clientX,clientY){
+  if(!d.ghost)return;
+  const s=sizes(d.o);
+  d.ghost.style.setProperty('--x',`${clientX-s.w/2}px`);
+  d.ghost.style.setProperty('--y',`${clientY-s.h/2}px`);
 }
 function onPointerMove(e){
   if(!drag||e.pointerId!==drag.pointerId)return;
@@ -278,11 +291,18 @@ function onPointerMove(e){
   if(!drag.started&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>=7){
     drag.started=true;clearSelection();
     if(drag.kind==='organ'){
-      const o=drag.o;if(!o.placed){const s=sizes(o);placeOrgan(o,{x:e.clientX-canvas.getBoundingClientRect().left-s.w/2,y:e.clientY-canvas.getBoundingClientRect().top-s.h/2});}
-      o.el.classList.add('dragging');
-      const cr=canvas.getBoundingClientRect();drag.offX=o.w/2;drag.offY=o.h/2;
-      if(o.placed && drag.o.placed){const old=cent(o);const near=Math.hypot(drag.startX-(cr.left+old.x),drag.startY-(cr.top+old.y));
-        if(near<Math.max(o.w,o.h)/2+20 && drag.startX>=cr.left){drag.offX=drag.startX-cr.left-o.x;drag.offY=drag.startY-cr.top-o.y;}}
+      const o=drag.o;
+      if(drag.wasPlaced){
+        // 原畫布上的字卡維持原本的抓取點，不切到卡片中心造成閃跳。
+        o.el.classList.add('dragging');
+      }else{
+        // 卡池字卡留在原處直到「放開在畫布」；固定定位的預覽卡全程跟著手指。
+        const s=sizes(o),ghost=o.el.cloneNode(true);
+        ghost.removeAttribute('data-organ-id');ghost.setAttribute('aria-hidden','true');ghost.tabIndex=-1;
+        ghost.classList.add('placed','dragging','drag-ghost');
+        ghost.style.setProperty('--w',`${s.w}px`);ghost.style.setProperty('--h',`${s.h}px`);
+        document.body.append(ghost);drag.ghost=ghost;
+      }
     }else{
       const ghost=document.createElement('span');ghost.className='matter-template';ghost.textContent=drag.name;ghost.style.cssText='position:fixed;width:74px;height:36px;z-index:200;pointer-events:none;opacity:.82;';
       document.body.append(ghost);drag.ghost=ghost;
@@ -291,8 +311,12 @@ function onPointerMove(e){
   if(!drag.started)return;
   e.preventDefault();
   if(drag.kind==='organ'){
-    const r=canvas.getBoundingClientRect(),o=drag.o;
-    relocate(o,e.clientX-r.left-drag.offX,e.clientY-r.top-drag.offY,false);
+    if(!drag.wasPlaced){
+      moveFloatingOrgan(drag,e.clientX,e.clientY);
+    }else{
+      const r=canvas.getBoundingClientRect(),o=drag.o;
+      relocate(o,e.clientX-r.left-drag.offX,e.clientY-r.top-drag.offY,false);
+    }
   }else if(drag.ghost){drag.ghost.style.left=e.clientX-37+'px';drag.ghost.style.top=e.clientY-18+'px';}
 }
 function onPointerUp(e){
@@ -302,8 +326,19 @@ function onPointerUp(e){
     if(d.kind==='organ'){
       const r=canvas.getBoundingClientRect(),o=d.o;
       const inArea=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
-      if(!inArea)removeOrgan(o);
-      else{const p=findSpot(o,o.x,o.y,snapping);o.x=p.x;o.y=p.y;showPosition(o);drawLines();say(snapping?'已貼齊附近格線；概念關係與連線保留。':`已移動「${o.name}」。`);}
+      if(!d.wasPlaced){
+        // 在側欄期間只顯示跟手預覽；唯有在畫布內放手才真正放入。
+        if(inArea){
+          const s=sizes(o);
+          placeOrgan(o,{x:e.clientX-r.left-s.w/2,y:e.clientY-r.top-s.h/2});
+          if(snapping){const p=findSpot(o,o.x,o.y,true);o.x=p.x;o.y=p.y;showPosition(o);}
+          drawLines();say(`已放入「${o.name}」${snapping?'，並貼齊格線':''}。`);
+        }else say('器官仍留在左側字卡區；請拖到畫布內放開。');
+      }else if(!inArea){removeOrgan(o);}
+      else{
+        const p=findSpot(o,o.x,o.y,snapping);o.x=p.x;o.y=p.y;showPosition(o);drawLines();
+        say(snapping?'已貼齊附近格線；概念關係與連線保留。':`已移動「${o.name}」。`);
+      }
     }else{
       const c=nearestConnection(e.clientX,e.clientY);if(c)attachMatter(c,d.name);else say('請把物質卡拖到連線中央的「＋物質」方框上；或先點物質，再點方框。');
     }

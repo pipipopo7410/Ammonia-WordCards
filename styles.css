@@ -17,17 +17,20 @@ h1{font-size:clamp(17px,1.6vw,22px);line-height:1.28;margin:0;white-space:normal
 .network-indicator{white-space:nowrap;font-size:11px;padding:2px 7px;border-radius:7px;background:#e4edf5;color:#385b70}
 .network-indicator.offline{color:#8b4b1c;background:#fff1dc}
 .workspace{width:100%;max-width:1820px;margin:0 auto;flex:1;min-height:0;display:flex;overflow:hidden}
-.sidebar{flex:0 0 246px;width:246px;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:11px 8px;border-right:1px solid var(--edge);background:white}
+.sidebar{flex:0 0 220px;width:220px;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:11px 8px;border-right:1px solid var(--edge);background:white}
 .pool-section{min-height:0;display:flex;flex-direction:column;min-width:0}
 .pool-section+.pool-section{border-left:1px solid #edf1f4;padding-left:6px}
 .pool-section h2{font-size:13px;color:#526c80;text-align:center;margin:0 0 9px;font-weight:800}.pool-section h2 small{display:block;font-weight:500;font-size:10px;color:#92a2af;margin-top:2px}
-.organ-pool,.matter-pool{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:8px;padding:3px 3px 16px;overscroll-behavior:contain;align-items:stretch}
+.organ-pool,.matter-pool{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:7px;padding:3px 3px 16px;overscroll-behavior:contain;align-items:stretch}
 .organ-card,.matter-template{border:1.5px solid var(--edge);border-radius:9px;display:flex;justify-content:center;align-items:center;text-align:center;box-shadow:0 2px 5px #203d500c;font-weight:800;touch-action:none;user-select:none;-webkit-user-select:none;position:relative;flex-shrink:0}
-.organ-card{width:100%;min-height:46px;height:46px;font-size:13px;line-height:1.1;color:var(--fg,#334155);background:var(--bg,#eaf3f6);border-color:var(--bd,#bfd3df)}
-.matter-template{width:100%;min-height:38px;height:38px;color:var(--fg,#ebffef);background:#172537;border-color:#334559;font-size:12px}
+.organ-card{width:100%;min-height:42px;height:42px;font-size:14.5px;line-height:1.1;color:var(--fg,#334155);background:var(--bg,#eaf3f6);border-color:var(--bd,#bfd3df)}
+.matter-template{width:84%;align-self:center;min-height:32px;height:32px;color:var(--fg,#ebffef);background:#172537;border-color:#334559;font-size:11.5px}
+.matter-pool{gap:11px}
+/* 視覺縮小但保留適合觸控的隱形命中範圍。 */
+.matter-template::before{content:"";position:absolute;inset:-5px 0}
 .organ-card:active,.matter-template:active{cursor:grabbing}
 .organ-card.pool-selected,.matter-template.pool-selected{outline:3px solid #2c9ce5;outline-offset:1px}
-.organ-card.placed{position:absolute;left:0;top:0;width:var(--w);height:var(--h);min-height:0;transform:translate3d(var(--x),var(--y),0);z-index:5;cursor:grab;box-shadow:0 2px 8px #163a5319;font-size:14px}
+.organ-card.placed{position:absolute;left:0;top:0;width:var(--w);height:var(--h);min-height:0;transform:translate3d(var(--x),var(--y),0);z-index:5;cursor:grab;box-shadow:0 2px 8px #163a5319;font-size:16px}
 .organ-card.placed.selected{outline:3px solid #4394ec;outline-offset:2px;z-index:7}
 .organ-card.dragging{z-index:12;box-shadow:0 12px 25px #142e5354}
 /* 卡池 -> 畫布的浮動預覽：固定在手指座標上，不受畫布起點與裁切影響。 */
@@ -35,17 +38,18 @@ h1{font-size:clamp(17px,1.6vw,22px);line-height:1.28;margin:0;white-space:normal
 .organ-card.snapped{animation:snapflash .35s ease-out}@keyframes snapflash{from{filter:drop-shadow(0 0 7px #0fbf9f)}to{filter:none}}
 .organ-card.special .center-tile{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:8px}
 .organ-card.special.placed{width:var(--w);height:var(--h);background:none;border:none;box-shadow:none;overflow:visible}
-.organ-card.special.placed .center-tile{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:108px;height:50px;background:#ebe7ff;border:2px solid #a9a1e8;border-radius:11px;box-shadow:0 3px 9px #40377e2a;font-size:14px}
+.organ-card.special.placed .center-tile{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:96px;height:44px;background:#ebe7ff;border:2px solid #a9a1e8;border-radius:11px;box-shadow:0 3px 9px #40377e2a;font-size:15.5px}
 .organ-card.special:not(.placed) .center-tile{background:transparent}
-.orbit{display:none;position:absolute;left:var(--ox);top:var(--oy);transform:translate(-50%,-50%);width:30px;height:30px;background:#f4f0ff;border:1.5px solid #a8a0e3;border-radius:50%;font-size:12px;color:#51498e;align-items:center;justify-content:center;font-weight:800;box-shadow:0 1px 4px #3c43761a;pointer-events:none}
+.orbit{display:none;position:absolute;left:var(--ox);top:var(--oy);transform:translate(-50%,-50%);width:25px;height:25px;background:#f4f0ff;border:1.5px solid #a8a0e3;border-radius:50%;font-size:10.5px;color:#51498e;align-items:center;justify-content:center;font-weight:800;box-shadow:0 1px 4px #3c43761a;pointer-events:none}
 .organ-card.special.placed .orbit{display:flex}
-.pool-placeholder{height:46px;border:1.5px dashed #bcced8;border-radius:9px;display:grid;place-items:center;background:#f6f9fa;color:#a1afbb;font-size:11px;flex-shrink:0}
+.pool-placeholder{height:42px;border:1.5px dashed #bcced8;border-radius:9px;display:grid;place-items:center;background:#f6f9fa;color:#a1afbb;font-size:11px;flex-shrink:0}
 .canvas-area{flex:1;min-width:0;min-height:0;position:relative;background:#fafcfe;display:flex;flex-direction:column}
 #canvas{position:relative;width:100%;height:100%;flex:1;min-height:300px;background-image:radial-gradient(#dce7ee 1.4px,transparent 1.4px);background-size:var(--grid) var(--grid);background-position:12px 12px;touch-action:manipulation;overflow:hidden}
 #canvas.placing-mode{cursor:crosshair}
 #svg-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}
 #line-slots{position:absolute;inset:0;pointer-events:none;z-index:3}
-.line-slot{position:absolute;width:69px;height:32px;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;border:1.5px dashed #9bacb9;background:#f8fcff;color:#597184;border-radius:7px;font-size:12px;font-weight:800;pointer-events:auto;touch-action:none;white-space:nowrap;box-shadow:0 1px 4px #0000000a}
+.line-slot{position:absolute;width:56px;height:28px;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;border:1.5px dashed #9bacb9;background:#f8fcff;color:#597184;border-radius:7px;font-size:11.5px;font-weight:800;pointer-events:auto;touch-action:none;white-space:nowrap;box-shadow:0 1px 4px #0000000a}
+.line-slot::before{content:"";position:absolute;inset:-8px -3px}
 .line-slot.filled{border:1px solid #364557;background:#182b3f;color:#f5f9fe;box-shadow:0 2px 6px #0002}.line-slot.filled[data-matter="胺基酸"]{color:#fed7aa}.line-slot.filled[data-matter="氨"]{color:#fecdd3}.line-slot.filled[data-matter="尿素"]{color:#fef08a}.line-slot.filled[data-matter="尿液"]{color:#bae6fd}.line-slot.filled[data-matter="汗液"]{color:#99f6e4}
 .line-slot.correct{border:2px solid #10a47d}.line-slot.wrong{border:2px solid #ef6165}
 .canvas-empty{pointer-events:none;position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);padding:18px;border:2px dashed #dbe6ed;border-radius:16px;color:#9aafbc;font-size:14px;white-space:nowrap;text-align:center;z-index:0}
@@ -54,7 +58,7 @@ h1{font-size:clamp(17px,1.6vw,22px);line-height:1.28;margin:0;white-space:normal
 .modal{background:white;padding:25px;border-radius:18px;width:min(440px,100%);box-shadow:0 20px 70px #061c3a52}
 .modal h2{margin:0 0 13px;font-size:21px}.modal p{font-size:15px;color:#43566b;line-height:1.65;margin:9px 0}.modal .btn{width:100%;margin-top:15px}
 .color-0{--bg:#ebe7ff;--bd:#b7ade9;--fg:#51488f}.color-1{--bg:#fff2df;--bd:#f4c78d;--fg:#815010}.color-2{--bg:#fef1ca;--bd:#ddba67;--fg:#77500f}.color-3{--bg:#dcfaed;--bd:#7cd3a7;--fg:#145f43}.color-4{--bg:#edf0ff;--bd:#a6b6ef;--fg:#3b4f8b}.color-5{--bg:#ffe3e8;--bd:#ef9eae;--fg:#883d55}.color-6{--bg:#e7edf4;--bd:#b2c5d4;--fg:#384e65}
-@media(max-width:950px){.workspace{flex-direction:column}.sidebar{flex:none;width:100%;height:142px;grid-template-columns:1fr 1fr;border-right:none;border-bottom:1px solid var(--edge);padding:7px 10px}.pool-section h2{margin-bottom:4px;text-align:left}.pool-section h2 small{display:inline;margin-left:8px}.organ-pool,.matter-pool{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:3px 4px 7px;gap:7px}.organ-card,.matter-template{flex:0 0 96px;width:96px;min-height:46px}.matter-template{height:46px}.pool-placeholder{flex:0 0 96px;width:96px}.canvas-area{min-height:350px}}
-@media(max-width:650px){body{height:auto;min-height:100dvh}.topbar{padding:9px 11px}.toolbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:6px}.toolbar .btn{font-size:12px;padding:6px;min-height:38px;white-space:normal}.notice{font-size:12px;padding:8px 11px}.network-indicator{font-size:10px}.workspace{overflow:visible;flex:none;min-height:540px}.sidebar{height:144px}.canvas-area{min-height:480px;height:calc(100dvh - 290px)}.canvas-empty{font-size:12px;padding:11px;white-space:normal;max-width:85%}}
+@media(max-width:950px){.workspace{flex-direction:column}.sidebar{flex:none;width:100%;height:132px;grid-template-columns:1fr 1fr;border-right:none;border-bottom:1px solid var(--edge);padding:7px 10px}.pool-section h2{margin-bottom:4px;text-align:left}.pool-section h2 small{display:inline;margin-left:8px}.organ-pool,.matter-pool{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:3px 4px 7px;gap:7px}.organ-card{flex:0 0 90px;width:90px;min-height:42px}.matter-template{flex:0 0 78px;width:78px;height:34px;min-height:34px}.pool-placeholder{flex:0 0 90px;width:90px}.canvas-area{min-height:350px}}
+@media(max-width:650px){body{height:auto;min-height:100dvh}.topbar{padding:9px 11px}.toolbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:6px}.toolbar .btn{font-size:12px;padding:6px;min-height:38px;white-space:normal}.notice{font-size:12px;padding:8px 11px}.network-indicator{font-size:10px}.workspace{overflow:visible;flex:none;min-height:540px}.sidebar{height:136px}.canvas-area{min-height:480px;height:calc(100dvh - 290px)}.canvas-empty{font-size:12px;padding:11px;white-space:normal;max-width:85%}}
 @media(max-height:560px) and (min-width:951px){.topbar{padding-top:5px;padding-bottom:5px}.notice{min-height:28px;padding-top:4px;padding-bottom:4px}.sidebar{padding-top:7px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

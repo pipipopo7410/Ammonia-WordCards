@@ -1,5 +1,5 @@
 /* 排氨 2.0｜路徑隔離的 PWA 離線快取；可同時安裝單元版與整合入口版。 */
-const VERSION='2.0.1-2026-11-12';
+const VERSION='2.0.2-2026-11-12';
 const SAFE_SCOPE=new URL(self.registration.scope).pathname.replace(/[^a-zA-Z0-9]/g,'_');
 const PREFIX='bio-anomi-'+SAFE_SCOPE+'-';
 const CACHE_NAME=PREFIX+VERSION;

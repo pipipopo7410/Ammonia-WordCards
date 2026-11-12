@@ -23,6 +23,9 @@ const REQUIRED = [
 ];
 const REQUIRED_KEYS=new Set(REQUIRED.map(x=>x.join('→')));
 const GRID=24, GAP=9;
+// 2.0.2: 視覺尺寸與連線命中區統一管理，避免改 CSS 後座標仍採用舊尺寸。
+const ORGAN_WIDTH=90, ORGAN_HEIGHT=43, SPECIAL_WIDTH=156, SPECIAL_HEIGHT=112;
+const MATTER_WIDTH=56, MATTER_HEIGHT=28, SLOT_CLEARANCE=5;
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),svg=$('svg-layer'),slots=$('line-slots');
 const orgPool=$('organ-pool'),matPool=$('matter-pool');
@@ -34,7 +37,7 @@ const nameOf=id=>organs.get(id)?.name;
 const keyOf=(from,to,matter)=>[nameOf(from),nameOf(to),matter||''].join('→');
 const say=s=>{$('status-text').textContent=s;};
 const rectOf=o=>({x:o.x,y:o.y,w:o.w,h:o.h});
-function sizes(o){return o.special?{w:180,h:128}:{w:106,h:51};}
+function sizes(o){return o.special?{w:SPECIAL_WIDTH,h:SPECIAL_HEIGHT}:{w:ORGAN_WIDTH,h:ORGAN_HEIGHT};}
 function occupied(exceptId){return [...organs.values()].filter(o=>o.placed && o.id!==exceptId).map(rectOf);}
 function overlap(x,y,w,h,rects){return rects.some(r=>x<r.x+r.w+GAP && x+w+GAP>r.x && y<r.y+r.h+GAP && y+h+GAP>r.y);}
 function clampPoint(o,x,y){return {x:clamp(x,0,Math.max(0,canvas.clientWidth-o.w)),y:clamp(y,0,Math.max(0,canvas.clientHeight-o.h))};}
@@ -198,15 +201,15 @@ function chooseSlotPosition(a,b,priorSlots=[]){
   for(const off of [0,27,-27,46,-46,70,-70,95,-95]){
     for(const t of [.5,.4,.6,.3,.7,.2,.8]){
       const x=a.x+vx*t+nx*off,y=a.y+vy*t+ny*off;
-      const rect={x:x-38,y:y-19,w:76,h:38};
+      const rect={x:x-MATTER_WIDTH/2-SLOT_CLEARANCE,y:y-MATTER_HEIGHT/2-SLOT_CLEARANCE,w:MATTER_WIDTH+SLOT_CLEARANCE*2,h:MATTER_HEIGHT+SLOT_CLEARANCE*2};
       if(rect.x<4||rect.y<4||rect.x+rect.w>canvas.clientWidth-4||rect.y+rect.h>canvas.clientHeight-4)continue;
       if(overlap(rect.x,rect.y,rect.w,rect.h,otherRects))continue;
       if(overlap(rect.x,rect.y,rect.w,rect.h,priorSlots))continue;
       return{x,y,rect};
     }
   }
-  const mid={x:clamp((a.x+b.x)/2,36,canvas.clientWidth-36),y:clamp((a.y+b.y)/2,18,canvas.clientHeight-18)};
-  return{x:mid.x,y:mid.y,rect:{x:mid.x-38,y:mid.y-19,w:76,h:38}};
+  const mid={x:clamp((a.x+b.x)/2,MATTER_WIDTH/2+SLOT_CLEARANCE,canvas.clientWidth-MATTER_WIDTH/2-SLOT_CLEARANCE),y:clamp((a.y+b.y)/2,MATTER_HEIGHT/2+SLOT_CLEARANCE,canvas.clientHeight-MATTER_HEIGHT/2-SLOT_CLEARANCE)};
+  return{x:mid.x,y:mid.y,rect:{x:mid.x-MATTER_WIDTH/2-SLOT_CLEARANCE,y:mid.y-MATTER_HEIGHT/2-SLOT_CLEARANCE,w:MATTER_WIDTH+SLOT_CLEARANCE*2,h:MATTER_HEIGHT+SLOT_CLEARANCE*2}};
 }
 function drawLines(){
   svg.replaceChildren();slots.replaceChildren();
@@ -224,8 +227,10 @@ function drawLines(){
     const from=organs.get(c.fromId),to=organs.get(c.toId);if(!from?.placed||!to?.placed)continue;
     const a=cent(from),b=cent(to),dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy)||1;
     // 讓線段從器官外緣出發，方向箭頭不被字卡完全遮住。
-    const trim1=from.special?55:32,trim2=to.special?55:32,shift=Math.min(Math.max(0,dist/2-3),trim1+trim2);
-    const s=Math.min(trim1,shift),t=Math.min(trim2,shift);
+    // 配合縮小的器官卡，依矩形邊界計算箭頭端點，不再使用舊尺寸的固定縮短值。
+    const edgeDistance=o=>Math.min((o.w/2+3)/(Math.abs(dx/dist)||1e-6),(o.h/2+3)/(Math.abs(dy/dist)||1e-6));
+    const s=Math.min(edgeDistance(from),Math.max(0,dist/2-3));
+    const t=Math.min(edgeDistance(to),Math.max(0,dist/2-3));
     const line=document.createElementNS(NS,'line');
     line.setAttribute('x1',a.x+dx/dist*s);line.setAttribute('y1',a.y+dy/dist*s);
     line.setAttribute('x2',b.x-dx/dist*t);line.setAttribute('y2',b.y-dy/dist*t);
@@ -304,7 +309,7 @@ function onPointerMove(e){
         document.body.append(ghost);drag.ghost=ghost;
       }
     }else{
-      const ghost=document.createElement('span');ghost.className='matter-template';ghost.textContent=drag.name;ghost.style.cssText='position:fixed;width:74px;height:36px;z-index:200;pointer-events:none;opacity:.82;';
+      const ghost=document.createElement('span');ghost.className='matter-template';ghost.textContent=drag.name;ghost.style.cssText=`position:fixed;width:${MATTER_WIDTH}px;height:${MATTER_HEIGHT}px;min-height:0;z-index:200;pointer-events:none;opacity:.82;`;
       document.body.append(ghost);drag.ghost=ghost;
     }
   }
@@ -317,7 +322,7 @@ function onPointerMove(e){
       const r=canvas.getBoundingClientRect(),o=drag.o;
       relocate(o,e.clientX-r.left-drag.offX,e.clientY-r.top-drag.offY,false);
     }
-  }else if(drag.ghost){drag.ghost.style.left=e.clientX-37+'px';drag.ghost.style.top=e.clientY-18+'px';}
+  }else if(drag.ghost){drag.ghost.style.left=e.clientX-MATTER_WIDTH/2+'px';drag.ghost.style.top=e.clientY-MATTER_HEIGHT/2+'px';}
 }
 function onPointerUp(e){
   if(!drag||e.pointerId!==drag.pointerId)return;

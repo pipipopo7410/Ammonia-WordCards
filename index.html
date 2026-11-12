@@ -12,19 +12,19 @@
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
   <link rel="stylesheet" href="./styles.css">
-  <title>排氨與泌尿｜概念圖練習 2.0.2</title>
+  <title>排氨與泌尿｜概念圖練習 2.0.3</title>
   <script src="./app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="branding">
       <img class="brand-icon" src="./icons/icon-192.png" alt="" width="42" height="42">
-      <div><h1>排氨與泌尿：概念圖練習</h1><span class="subline">生物互動教學系統 <strong>2.0.2 測試版</strong></span></div>
+      <div><h1>排氨與泌尿：概念圖練習</h1><span class="subline">生物互動教學系統 <strong>2.0.3 測試版</strong></span></div>
     </div>
     <div class="toolbar" aria-label="活動操作">
       <button class="btn primary" id="check-btn" type="button">檢查架構</button>
       <button class="btn" id="snap-btn" aria-pressed="false" type="button" title="開啟時立即整理現有器官字卡；之後移動字卡時自動貼齊格線">貼齊格線：關</button>
-      <button class="btn" id="return-btn" type="button" disabled>收回器官</button>
+      <button class="btn" id="hint-btn" aria-pressed="false" type="button" title="關閉時可放入任意物質，按檢查才揭曉；開啟時錯誤物質會立刻退回">即時提示：關</button>
       <button class="btn" id="reset-btn" type="button">重設</button>
       <button class="btn guide" id="install-btn" type="button">安裝說明</button>
     </div>
@@ -34,13 +34,13 @@
     <span id="network-status" class="network-indicator" aria-label="連線狀態">偵測中</span>
   </div>
   <main class="workspace">
-    <aside class="sidebar" aria-label="字卡來源">
+    <aside class="sidebar" id="sidebar" aria-label="字卡來源">
       <section class="pool-section">
-        <h2>器官卡 <small>各放一次</small></h2>
+        <h2>器官卡 <small>拖回這裡可收回</small></h2>
         <div id="organ-pool" class="organ-pool" aria-label="器官字卡"></div>
       </section>
       <section class="pool-section">
-        <h2>物質卡 <small>可重複使用</small></h2>
+        <h2>物質卡 <small>可拖出重新放置</small></h2>
         <div id="matter-pool" class="matter-pool" aria-label="物質字卡"></div>
       </section>
     </aside>

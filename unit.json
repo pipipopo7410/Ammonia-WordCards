@@ -1,7 +1,7 @@
 {
   "id": "anomi",
   "name": "排氨與泌尿",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "entry": "./index.html",
   "manifest": "./manifest.webmanifest",
   "icon": "./icons/icon-192.png",

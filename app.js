@@ -29,9 +29,9 @@ const MATTER_WIDTH=56, MATTER_HEIGHT=28, SLOT_CLEARANCE=5;
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),svg=$('svg-layer'),slots=$('line-slots');
 const orgPool=$('organ-pool'),matPool=$('matter-pool');
-const snapButton=$('snap-btn'),returnButton=$('return-btn');
+const snapButton=$('snap-btn'),hintButton=$('hint-btn'),sidebar=$('sidebar');
 let organs=new Map(), connections=[], sourceId=null, activeTool=null, drag=null;
-let snapping=false, nextConnectionId=0, ignoreClickUntil=0, modalLastFocus=null, deferredInstall=null, offlineReady=false;
+let snapping=false, immediateHint=false, magnetConnId=null, nextConnectionId=0, ignoreClickUntil=0, modalLastFocus=null, deferredInstall=null, offlineReady=false;
 const clamp=(n,a,b)=>Math.max(a,Math.min(n,Math.max(a,b)));
 const nameOf=id=>organs.get(id)?.name;
 const keyOf=(from,to,matter)=>[nameOf(from),nameOf(to),matter||''].join('→');
@@ -71,14 +71,14 @@ function clearSelection(){
   if(sourceId&&organs.get(sourceId))organs.get(sourceId).el.classList.remove('selected');
   sourceId=null;activeTool=null;
   document.querySelectorAll('.pool-selected').forEach(el=>el.classList.remove('pool-selected'));
-  canvas.classList.remove('placing-mode'); returnButton.disabled=true;
+  canvas.classList.remove('placing-mode');
 }
 function chooseTool(tool,el){
   clearSelection();activeTool=tool;el?.classList.add('pool-selected');canvas.classList.add('placing-mode');
   say(tool.kind==='organ'?'在畫布上點一下放置器官；也可以直接拖曳。':'先連接兩張器官卡，再點選連線中間的虛線框放置物質。');
 }
 function setSource(o){
-  clearSelection();sourceId=o.id;o.el.classList.add('selected');returnButton.disabled=false;
+  clearSelection();sourceId=o.id;o.el.classList.add('selected');
   say(`已選取「${o.name}」：再點另一張器官建立 ${o.name} → 對方 的箭頭。點同一張可取消。`);
 }
 function createOrgan(data,index){
@@ -98,7 +98,7 @@ function createOrgan(data,index){
   return o;
 }
 function init(){
-  cancelDrag();clearSelection();organs.clear();connections=[];nextConnectionId=0;
+  cancelDrag();clearSelection();organs.clear();connections=[];nextConnectionId=0;clearMagnetTarget();sidebar.classList.remove('drop-target');
   // 真正移除前一輪畫布上的器官節點，避免重設後殘留與重複 ID（1.0 B02）。
   canvas.querySelectorAll('.organ-card.placed').forEach(el=>el.remove());
   orgPool.replaceChildren();matPool.replaceChildren();svg.replaceChildren();slots.replaceChildren();
@@ -110,6 +110,7 @@ function init(){
   });
   updateCounter();say('將器官字卡拖到畫布，依序點兩張器官建立箭頭，再把物質拖到連線上。');
   snapButton.textContent='貼齊格線：關';snapButton.setAttribute('aria-pressed','false');snapping=false;
+  immediateHint=false;hintButton.textContent='即時提示：關';hintButton.setAttribute('aria-pressed','false');
   hideDialog();
 }
 function placeOrgan(o,position){
@@ -169,23 +170,35 @@ function canvasClick(e){
   placeOrgan(o,{x:e.clientX-r.left-s.w/2,y:e.clientY-r.top-s.h/2});
   clearSelection();say(`已放入「${o.name}」。點兩張器官字卡可建立有方向的連線。`);
 }
-function attachMatter(conn,name){
-  if(!MATTERS.some(m=>m.name===name))return;
+function acceptsMatter(conn,name){
+  return REQUIRED_KEYS.has(keyOf(conn.fromId,conn.toId,name));
+}
+function attachMatter(conn,name,quiet=false){
+  if(!MATTERS.some(m=>m.name===name))return false;
+  if(immediateHint&&!acceptsMatter(conn,name)){
+    const el=slots.querySelector(`[data-link-id="${conn.id}"]`);
+    if(el){el.classList.remove('magnet-target');void el.offsetWidth;el.classList.add('reject-flash');}
+    say(`「${name}」不適合這條路徑，請再想想。可關閉「即時提示」自行完成後再檢查。`);
+    return false;
+  }
   conn.matter=name;conn.status='neutral';drawLines();updateCounter();
-  say(`已在 ${nameOf(conn.fromId)} → ${nameOf(conn.toId)} 的路徑放上「${name}」。`);
+  const sl=slots.querySelector(`[data-link-id="${conn.id}"]`);
+  if(sl){sl.classList.remove('magnet-pop');void sl.offsetWidth;sl.classList.add('magnet-pop');}
+  if(!quiet)say(`已在 ${nameOf(conn.fromId)} → ${nameOf(conn.toId)} 的路徑放上「${name}」。`);
+  return true;
 }
 function slotClick(id){
   const c=connections.find(c=>c.id===id);if(!c)return;
   if(activeTool?.kind==='matter'){
     const name=activeTool.name;attachMatter(c,name);clearSelection();return;
   }
-  if(c.matter){c.matter='';c.status='neutral';drawLines();updateCounter();say('已取下物質卡；可以再放入其他物質。');return;}
+  if(c.matter){c.matter='';c.status='neutral';drawLines();updateCounter();say('已取下物質卡；也能直接把物質從線框中拖出。');return;}
   say('先從物質卡區選一張，再點這個虛線框；或直接把物質拖過來。');
 }
-function nearestConnection(clientX,clientY){
+function nearestConnection(clientX,clientY,threshold=56){
   const r=canvas.getBoundingClientRect(),x=clientX-r.left,y=clientY-r.top;
   let best=null;
-  for(const c of connections){const p=(Number.isFinite(c.slotX)&&Number.isFinite(c.slotY))?{x:c.slotX,y:c.slotY}:lineMid(c);if(!p)continue;const d=Math.hypot(x-p.x,y-p.y);if(d<62 && (!best||d<best.dist))best={conn:c,dist:d};}
+  for(const c of connections){const p=(Number.isFinite(c.slotX)&&Number.isFinite(c.slotY))?{x:c.slotX,y:c.slotY}:lineMid(c);if(!p)continue;const d=Math.hypot(x-p.x,y-p.y);if(d<threshold && (!best||d<best.dist))best={conn:c,dist:d};}
   return best?.conn||null;
 }
 function lineMid(c){
@@ -241,9 +254,10 @@ function drawLines(){
     const slot=document.createElement('button');slot.type='button';slot.className='line-slot';
     if(c.matter){slot.classList.add('filled');slot.dataset.matter=c.matter;}
     if(c.status==='green')slot.classList.add('correct');if(c.status==='red')slot.classList.add('wrong');
-    slot.style.left=pos.x+'px';slot.style.top=pos.y+'px';slot.textContent=c.matter||'＋物質';
+    slot.style.left=pos.x+'px';slot.style.top=pos.y+'px';slot.textContent=c.matter||'＋物質';slot.dataset.linkId=c.id;
     slot.setAttribute('aria-label',`${from.name}到${to.name}的物質：${c.matter||'尚未放置'}；點擊可放入或取下`);
-    slot.addEventListener('click',e=>{e.stopPropagation();slotClick(c.id);});slots.append(slot);
+    if(c.matter)slot.addEventListener('pointerdown',e=>onPointerDown(e,{kind:'attachedMatter',name:c.matter,connId:c.id,el:slot}));
+    slot.addEventListener('click',e=>{e.stopPropagation();if(performance.now()<ignoreClickUntil)return;slotClick(c.id);});slots.append(slot);
   }
 }
 function checkAnswers(){
@@ -268,11 +282,37 @@ function showDialog(title,content,isHTML=false){
   $('dialog').hidden=false;$('dialog-close').focus();
 }
 function hideDialog(){const d=$('dialog');if(!d.hidden){d.hidden=true;modalLastFocus?.focus?.();}}
-function cancelDrag(){if(!drag)return;window.removeEventListener('pointermove',onPointerMove);window.removeEventListener('pointerup',onPointerUp);window.removeEventListener('pointercancel',onPointerCancel);drag.ghost?.remove();drag.o?.el.classList.remove('dragging');drag=null;}
+function clearMagnetTarget(){
+  if(magnetConnId){slots.querySelector(`[data-link-id="${magnetConnId}"]`)?.classList.remove('magnet-target');magnetConnId=null;}
+}
+function setMagnetTarget(c){
+  if(c?.id===magnetConnId)return;
+  clearMagnetTarget();if(c){magnetConnId=c.id;slots.querySelector(`[data-link-id="${c.id}"]`)?.classList.add('magnet-target');}
+}
+function bounceRejectedMatter(ghost){
+  if(!ghost)return;
+  const copy=ghost.cloneNode(true);
+  copy.classList.remove('magnetized');copy.classList.add('matter-rejected');
+  document.body.append(copy);
+  const done=()=>copy.remove();
+  copy.addEventListener('animationend',done,{once:true});
+  setTimeout(done,460);
+}
+function inRect(x,y,r){return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;}
+function cancelDrag(){
+  if(!drag)return;
+  window.removeEventListener('pointermove',onPointerMove);window.removeEventListener('pointerup',onPointerUp);window.removeEventListener('pointercancel',onPointerCancel);
+  if(drag.kind==='attachedMatter'&&drag.started&&drag.originalMatterRemoved){
+    const orig=connections.find(c=>c.id===drag.connId);
+    if(orig&&!orig.matter){orig.matter=drag.name;orig.status='neutral';drawLines();updateCounter();}
+  }
+  drag.ghost?.remove();drag.o?.el.classList.remove('dragging');sidebar.classList.remove('drop-target');clearMagnetTarget();drag=null;
+}
 function onPointerDown(e,desc){
   if(e.button!==undefined && e.button!==0)return;
   if(drag)cancelDrag();
   if(desc.kind==='organ'&&desc.o.placed&&activeTool?.kind==='matter')clearSelection();
+  if(desc.kind==='attachedMatter'){clearSelection();}
   // 記住「原本就在畫布上」與「從卡池首次拖出」，不可在跨過卡池邊界前就改變來源元素的位置。
   const wasPlaced=desc.kind==='organ'&&desc.o.placed;
   let offX=0,offY=0;
@@ -280,7 +320,7 @@ function onPointerDown(e,desc){
     const r=canvas.getBoundingClientRect();
     offX=e.clientX-r.left-desc.o.x;offY=e.clientY-r.top-desc.o.y;
   }
-  drag={...desc,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,started:false,ghost:null,wasPlaced,offX,offY};
+  drag={...desc,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,started:false,ghost:null,wasPlaced,offX,offY,originalMatterRemoved:false,originX:wasPlaced?desc.o.x:null,originY:wasPlaced?desc.o.y:null};
   e.stopPropagation();window.addEventListener('pointermove',onPointerMove,{passive:false});
   window.addEventListener('pointerup',onPointerUp);window.addEventListener('pointercancel',onPointerCancel);
 }
@@ -309,47 +349,92 @@ function onPointerMove(e){
         document.body.append(ghost);drag.ghost=ghost;
       }
     }else{
-      const ghost=document.createElement('span');ghost.className='matter-template';ghost.textContent=drag.name;ghost.style.cssText=`position:fixed;width:${MATTER_WIDTH}px;height:${MATTER_HEIGHT}px;min-height:0;z-index:200;pointer-events:none;opacity:.82;`;
+      // 線框內已吸附的物質：真正拖動時先從原框拔出，再由跟手預覽接管。
+      if(drag.kind==='attachedMatter'){
+        const orig=connections.find(c=>c.id===drag.connId);
+        if(!orig||orig.matter!==drag.name){cancelDrag();return;}
+        orig.matter='';orig.status='neutral';drag.originalMatterRemoved=true;drawLines();updateCounter();
+      }
+      const ghost=document.createElement('span');ghost.className='matter-drag-ghost';ghost.textContent=drag.name;
+      const matterInfo=MATTERS.find(m=>m.name===drag.name);
+      ghost.style.color=matterInfo?.color||'#fff';
       document.body.append(ghost);drag.ghost=ghost;
     }
   }
   if(!drag.started)return;
   e.preventDefault();
   if(drag.kind==='organ'){
+    sidebar.classList.toggle('drop-target',drag.wasPlaced&&inRect(e.clientX,e.clientY,sidebar.getBoundingClientRect()));
     if(!drag.wasPlaced){
       moveFloatingOrgan(drag,e.clientX,e.clientY);
     }else{
       const r=canvas.getBoundingClientRect(),o=drag.o;
       relocate(o,e.clientX-r.left-drag.offX,e.clientY-r.top-drag.offY,false);
     }
-  }else if(drag.ghost){drag.ghost.style.left=e.clientX-MATTER_WIDTH/2+'px';drag.ghost.style.top=e.clientY-MATTER_HEIGHT/2+'px';}
+  }else if(drag.ghost){
+    const candidate=nearestConnection(e.clientX,e.clientY,54);
+    setMagnetTarget(candidate);
+    let x=e.clientX,y=e.clientY;
+    if(candidate){
+      // 靠近連線框時預覽卡往框中央吸附，離開吸附範圍立即恢復跟手。
+      const r=canvas.getBoundingClientRect();
+      x=x*.28+(r.left+candidate.slotX)*.72;
+      y=y*.28+(r.top+candidate.slotY)*.72;
+    }
+    drag.ghost.style.left=(x-MATTER_WIDTH/2)+'px';
+    drag.ghost.style.top=(y-MATTER_HEIGHT/2)+'px';
+    drag.ghost.classList.toggle('magnetized',!!candidate);
+  }
 }
 function onPointerUp(e){
   if(!drag||e.pointerId!==drag.pointerId)return;
-  const d=drag,moved=d.started;ignoreClickUntil=moved?performance.now()+180:0;
+  const d=drag,moved=d.started;
+  ignoreClickUntil=moved?performance.now()+250:0;
   if(moved){
     if(d.kind==='organ'){
       const r=canvas.getBoundingClientRect(),o=d.o;
-      const inArea=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
+      const inArea=inRect(e.clientX,e.clientY,r);
       if(!d.wasPlaced){
-        // 在側欄期間只顯示跟手預覽；唯有在畫布內放手才真正放入。
         if(inArea){
-          const s=sizes(o);
-          placeOrgan(o,{x:e.clientX-r.left-s.w/2,y:e.clientY-r.top-s.h/2});
+          const sz=sizes(o);
+          placeOrgan(o,{x:e.clientX-r.left-sz.w/2,y:e.clientY-r.top-sz.h/2});
           if(snapping){const p=findSpot(o,o.x,o.y,true);o.x=p.x;o.y=p.y;showPosition(o);}
           drawLines();say(`已放入「${o.name}」${snapping?'，並貼齊格線':''}。`);
-        }else say('器官仍留在左側字卡區；請拖到畫布內放開。');
-      }else if(!inArea){removeOrgan(o);}
-      else{
+        }else say('器官仍留在字卡區；請拖到畫布內放開。');
+      }else if(inRect(e.clientX,e.clientY,sidebar.getBoundingClientRect())){
+        removeOrgan(o);
+      }else if(!inArea){
+        // 只有拖回器官字卡區才收回；從畫布其他邊緣放開則回原位，避免誤刪整條路徑。
+        o.x=d.originX;o.y=d.originY;showPosition(o);drawLines();
+        say('器官沒有放到字卡區，已回到原來位置。');
+      }else{
         const p=findSpot(o,o.x,o.y,snapping);o.x=p.x;o.y=p.y;showPosition(o);drawLines();
         say(snapping?'已貼齊附近格線；概念關係與連線保留。':`已移動「${o.name}」。`);
       }
     }else{
-      const c=nearestConnection(e.clientX,e.clientY);if(c)attachMatter(c,d.name);else say('請把物質卡拖到連線中央的「＋物質」方框上；或先點物質，再點方框。');
+      const target=nearestConnection(e.clientX,e.clientY,54);
+      clearMagnetTarget();
+      if(target){
+        if(attachMatter(target,d.name)){
+          d.originalMatterRemoved=false;
+        }else{
+          bounceRejectedMatter(d.ghost);
+          if(d.kind==='attachedMatter'){
+            const origin=connections.find(c=>c.id===d.connId);
+            if(origin&&!origin.matter){origin.matter=d.name;origin.status='neutral';drawLines();updateCounter();}
+            d.originalMatterRemoved=false;
+            say('即時提示：物質不適合這條路徑，已彈回原來的線框。');
+          }
+        }
+      }else if(d.kind==='attachedMatter'){
+        d.originalMatterRemoved=false; // 放開在任意空白處就是真正拔出，模板仍留在字卡池。
+        say(`已把「${d.name}」從連線中拔出；可以再拖放其他物質。`);
+      }else say('未接近連線框，物質卡已回到側欄。');
     }
   }else if(d.kind==='organ')onOrganClick(d.o);
+  else if(d.kind==='attachedMatter'){ignoreClickUntil=performance.now()+250;slotClick(d.connId);}
   else chooseTool({kind:'matter',name:d.name},d.el);
-  cancelDrag();
+  if(drag){drag.originalMatterRemoved=false;cancelDrag();}
 }
 function onPointerCancel(){cancelDrag();}
 function confirmReset(){
@@ -380,7 +465,12 @@ async function verifyOffline(reg){
 // 主操作
 $('check-btn').addEventListener('click',checkAnswers);
 snapButton.addEventListener('click',()=>{snapping=!snapping;snapButton.setAttribute('aria-pressed',String(snapping));snapButton.textContent='貼齊格線：'+(snapping?'開':'關');if(snapping){const n=alignAll();say(`已開啟貼齊格線，立即整理 ${n} 張字卡；之後移動也會自動貼齊。`);}else say('已關閉貼齊格線，可以自由移動字卡。');});
-returnButton.addEventListener('click',()=>{if(sourceId){const o=organs.get(sourceId);clearSelection();removeOrgan(o);}});
+hintButton.addEventListener('click',()=>{
+  immediateHint=!immediateHint;
+  hintButton.textContent='即時提示：'+(immediateHint?'開':'關');
+  hintButton.setAttribute('aria-pressed',String(immediateHint));
+  say(immediateHint?'即時提示已開啟：錯誤物質會被退回；不直接告訴你正解。':'即時提示已關閉：物質可自由放入，按「檢查架構」時再判定。');
+});
 $('reset-btn').addEventListener('click',confirmReset);
 $('install-btn').addEventListener('click',showInstall);
 $('dialog-close').addEventListener('click',hideDialog);
